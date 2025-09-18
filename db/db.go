@@ -36,4 +36,19 @@ func createTables() {
 	if err != nil {
 		panic("Could not create books table.")
 	}
+
+	createUsersTable := `
+	CREATE TABLE IF NOT EXISTS users (
+		name TEXT NOT NULL,
+		email TEXT PRIMARY KEY,
+		password TEXT NOT NULL,
+		isAdmin BOOLEAN
+	)
+	`
+
+	_, err = DB.Exec(createUsersTable)
+
+	if err != nil {
+		panic("Could not create users table.")
+	}
 }
