@@ -8,6 +8,13 @@ import (
 )
 
 func CreateBook(context *gin.Context) {
+	isAdmin := context.GetBool("isAdmin")
+
+	if !isAdmin {
+		context.JSON(http.StatusUnauthorized, gin.H{"message": "Unauthorized operation! :("})
+		return
+	}
+
 	var book models.Book
 	err := context.ShouldBind(&book)
 

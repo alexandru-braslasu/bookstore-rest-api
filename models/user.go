@@ -2,11 +2,10 @@ package models
 
 import (
 	"errors"
-	"log"
+	"fmt"
 
 	"bookstore.com/booking/db"
 	"bookstore.com/booking/utils"
-	"github.com/spf13/viper"
 )
 
 type User struct {
@@ -61,20 +60,49 @@ func (user User) ValidateUser() error {
 	return nil
 }
 
-func ViperGetSecretKey() string {
-  viper.SetConfigFile(".env")
+func (user *User) GetIsAdminByEmail() error {
+	query := `
+	SELECT isAdmin
+	FROM users
+	WHERE email = ?
+	`
+	row := db.DB.QueryRow(query, user.Email)
+	var isAdmin bool
+	err := row.Scan(&isAdmin)
 
-  err := viper.ReadInConfig()
+	if err != nil {
+		return err
+	}
 
-  if err != nil {
-    log.Fatalf("Error while reading config file %s", err)
-  }
+	user.IsAdmin = isAdmin
+	return nil
+}
 
-  value, ok := viper.Get("SECRET_KEY").(string)
+func GetBooksSavedByUser(email string) ([]Book, error) {
+	query := `
+	SELECT title, author, description, nrSamples
+	FROM saved_books
+	WHERE email = ?
+	`
+	rows, err := db.DB.Query(query, email)
 
-  if !ok {
-    log.Fatalf("Invalid type assertion")
-  }
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-  return value
+	fmt.Println("here")
+
+	var books []Book
+	for rows.Next() {
+		var book Book
+		err = rows.Scan(&book.Title, &book.Author, &book.Description, &book.NrSamples)
+
+		if err != nil {
+			return nil, err
+		}
+
+		books = append(books, book)
+	}
+	return books, nil
 }
