@@ -106,3 +106,18 @@ func GetBooksSavedByUser(email string) ([]Book, error) {
 	}
 	return books, nil
 }
+
+func VerifyExists(email string) (int , error) {
+	query := `
+	SELECT COUNT(*)
+	FROM users
+	WHERE email = ?
+	`
+	row := db.DB.QueryRow(query, email)
+	var exists int
+	err := row.Scan(&exists)
+	if err != nil {
+		return 0, err
+	}
+	return exists, nil
+}

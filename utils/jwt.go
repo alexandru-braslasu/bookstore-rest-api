@@ -1,12 +1,18 @@
 package utils
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/spf13/viper"
+	"github.com/joho/godotenv"
 )
 
 func GenerateToken(email string, isAdmin bool) (string, error) {
@@ -16,7 +22,7 @@ func GenerateToken(email string, isAdmin bool) (string, error) {
 		"exp": time.Now().Add(time.Hour * 2).Unix(),
 	})
 
-	return token.SignedString([]byte(viperGetSecretKey()))
+	return token.SignedString([]byte(os.Getenv("SECRET_KEY")))
 }
 
 func VerifyToken(token string) (string, bool, error) {
@@ -27,7 +33,7 @@ func VerifyToken(token string) (string, bool, error) {
 			return nil, errors.New("Unexpected signing method")
 		}
 
-		return []byte(viperGetSecretKey()), nil
+		return []byte(os.Getenv("SECRET_KEY")), nil
 	})
 
 	if err != nil {
@@ -52,20 +58,45 @@ func VerifyToken(token string) (string, bool, error) {
 	return email, isAdmin, nil
 }
 
-func viperGetSecretKey() string {
-  viper.SetConfigFile(".env")
+type TokenInfo struct {
+    Issuer         string `json:"iss"`
+    Audience       string `json:"aud"`
+    ExpirationTime string `json:"exp"`
+    IssuedTime     string `json:"iat"`
+    Email          string `json:"email"`
+    EmailVerified  string `json:"email_verified"`
+}
 
-  err := viper.ReadInConfig()
+func VerifyGoogleToken(id_token string) (string, bool, error) {
+	const googleTokenURL = "https://oauth2.googleapis.com/tokeninfo?id_token=%s"
+	err := godotenv.Load()
+	if err != nil {
+		return "", false, err
+	}
+    resp, err := http.Get(fmt.Sprintf(googleTokenURL, id_token))
+    if err != nil {
+        return "", false, err
+    }
+    defer func(Body io.ReadCloser) {
+        err := Body.Close()
+        if err != nil {
+            log.Println(err)
+        }
+    }(resp.Body)
 
-  if err != nil {
-    log.Fatalf("Error while reading config file %s", err)
-  }
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return "", false, err
+    }
 
-  value, ok := viper.Get("SECRET_KEY").(string)
+    var tokenInfo TokenInfo
+    err = json.Unmarshal(body, &tokenInfo)
+    if err != nil {
+        return "", false, err
+    }
+    if !strings.Contains(tokenInfo.Audience, os.Getenv("CLIENT_ID")) {
+        return "", false, errors.New("token err")
+    }
 
-  if !ok {
-    log.Fatalf("Invalid type assertion")
-  }
-
-  return value
+    return tokenInfo.Email, false, nil
 }

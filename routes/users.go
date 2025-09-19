@@ -2,10 +2,14 @@ package routes
 
 import (
 	"net/http"
+	"net/mail"
 
+	"bookstore.com/booking/googleauth"
 	"bookstore.com/booking/models"
 	"bookstore.com/booking/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"github.com/markbates/goth/gothic"
 )
 
 func signup(context *gin.Context) {
@@ -14,6 +18,13 @@ func signup(context *gin.Context) {
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse request."})
+		return
+	}
+
+	_, err = mail.ParseAddress(user.Email)
+
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Invalid address format!"})
 		return
 	}
 
@@ -57,6 +68,49 @@ func login(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, gin.H{"message": "Login successful!", "token": token})
+}
+
+func loginWithGoogle(context *gin.Context) {
+	err := godotenv.Load()
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	googleauth.RegisterProvider()
+	query := context.Request.URL.Query()
+    query.Add("provider", "google")
+    context.Request.URL.RawQuery = query.Encode()
+    gothic.BeginAuthHandler(context.Writer, context.Request)
+}
+
+func AuthResponse(context *gin.Context) {
+    query := context.Request.URL.Query()
+    query.Add("provider", "google")
+    context.Request.URL.RawQuery = query.Encode()
+
+    user, err := gothic.CompleteUserAuth(context.Writer, context.Request)
+    if err != nil {
+        context.AbortWithError(http.StatusInternalServerError, err)
+        return
+    }
+
+	exists, err := models.VerifyExists(user.Email)
+	
+	if err != nil {
+		context.AbortWithError(http.StatusInternalServerError, err)
+        return
+	}
+
+	if exists == 0 {
+		var userInDB models.User
+		userInDB.Email = user.Email
+		userInDB.Name = user.Name
+		userInDB.Password = ""
+		userInDB.IsAdmin = false
+		userInDB.AddUserToTable() 
+	}
+
+	context.JSON(http.StatusOK, user)
 }
 
 func saveBook(context *gin.Context) {

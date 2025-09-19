@@ -11,6 +11,8 @@ func StartRoutes(server *gin.Engine) {
 	server.GET("/bookstore/books/findByAuthor/:author", GetBooksByAuthor)
 	server.POST("/bookstore/users/signup", signup)
 	server.POST("/bookstore/users/login", login)
+	server.GET("/bookstore/users/loginWithGoogle", loginWithGoogle)
+	server.GET("/bookstore/users/auth", AuthResponse)
 
 	authenticated := server.Group("/bookstore")
 	authenticated.Use(middlewares.Authenticate)

@@ -18,11 +18,15 @@ func Authenticate(context *gin.Context) {
 	email, isAdmin, err := utils.VerifyToken(token)
 
 	if err != nil {
-		context.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Not authorized."})
-		return
+		email, isAdmin, err = utils.VerifyGoogleToken(token)
+		if err != nil {
+			context.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "Not authorized."})
+			return
+		}
 	}
 
-	context.Set("isAdmin", isAdmin)
 	context.Set("email", email)
+	context.Set("isAdmin", isAdmin)
+
 	context.Next()
 }
